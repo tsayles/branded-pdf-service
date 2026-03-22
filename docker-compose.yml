@@ -1,0 +1,50 @@
+---
+# md-to-pdf — Docker Compose service definition
+#
+# Usage
+# -----
+#   cd services/md-to-pdf
+#   docker compose up -d          # start (builds image on first run)
+#   docker compose logs -f        # follow logs
+#   docker compose down           # stop and remove containers
+#
+# Brand configs
+# -------------
+#   Place brand sub-directories under ./brands/ (or override the
+#   BRANDS_DIR environment variable below).  Each brand directory must
+#   contain:
+#       meta.json   — organisation metadata
+#       brand.typ   — Typst brand template
+#       logo.png    — organisation logo (optional)
+#
+#   See README.md for the full brand config format.
+#
+# Quick test
+# ----------
+#   curl -s -X POST http://localhost:8100/render \
+#     -H "Content-Type: application/json" \
+#     -d '{"brand":"greencrest-villa","markdown":"# Hello\nWorld"}' \
+#     -o test.pdf
+
+services:
+  md-to-pdf:
+    build: .
+    image: md-to-pdf:latest
+    container_name: md-to-pdf
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    volumes:
+      - ./brands:/brands:ro
+    environment:
+      BRANDS_DIR: /brands
+      PANDOC_PATH: /usr/local/bin/pandoc
+      TYPST_PATH: /usr/local/bin/typst
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
