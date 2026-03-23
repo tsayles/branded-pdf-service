@@ -278,7 +278,8 @@ PDF bytes returned in HTTP response
 |---------|--------|---------|
 | v0.1.0 | ✅ Released | Core rendering service (`POST /render`, brand templates, watermarks) |
 | v0.2.0 | ✅ Released | Brand Management API, KISS Authentication, MCP Server (stdio) |
-| v0.3.0 | 🗺️ Planned | Docker Hub publish; multi-arch image; CI image push on tag |
+| v0.2.1 | ✅ Released | CI fixes: buildx `load: true`, integration test marker, polling healthz |
+| v0.3.0 | 🗺️ Planned | Docker Hub publish; multi-arch CI image push on tag |
 
 ---
 
