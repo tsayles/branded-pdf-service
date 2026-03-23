@@ -11,26 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
-class BrandMetaResponse(BaseModel):
-    """Response body for GET /brands/{slug}."""
-
-    slug: str = Field(..., description="Brand identifier slug.")
-    meta: Dict[str, Any] = Field(
-        ..., description="Contents of the brand's meta.json."
-    )
-
-
-class BrandUploadResponse(BaseModel):
-    """Response body for POST /brands/{slug}."""
-
-    slug: str = Field(..., description="Brand identifier slug.")
-    created: bool = Field(
-        ...,
-        description=(
-            "True if this was a new brand creation; False if an "
-            "existing brand was replaced."
-        ),
-    )
+class DocMeta(BaseModel):
     """Document-level metadata injected into the branded header / meta bar."""
 
     prepared_by: Optional[str] = Field(
@@ -49,8 +30,7 @@ class BrandUploadResponse(BaseModel):
 
 
 class RenderRequest(BaseModel):
-    """
-    Request body for POST /render.
+    """Request body for POST /render.
 
     ``markdown`` may be a single Markdown string **or** a list of Markdown
     strings.  When a list is supplied each element is rendered as an
@@ -68,8 +48,8 @@ class RenderRequest(BaseModel):
     markdown: Union[str, List[str]] = Field(
         ...,
         description=(
-            "Markdown content.  Provide a single string or a list of strings "
-            "for multi-section documents."
+            "Markdown content.  Provide a single string or a list of "
+            "strings for multi-section documents."
         ),
     )
     meta: Optional[DocMeta] = Field(
@@ -79,7 +59,29 @@ class RenderRequest(BaseModel):
     watermark: Optional[str] = Field(
         default=None,
         description=(
-            "Optional diagonal watermark text (e.g. 'DRAFT').  Applied to "
-            "every page of the finished PDF."
+            "Optional diagonal watermark text (e.g. 'DRAFT').  Applied "
+            "to every page of the finished PDF."
+        ),
+    )
+
+
+class BrandMetaResponse(BaseModel):
+    """Response body for GET /brands/{slug}."""
+
+    slug: str = Field(..., description="Brand identifier slug.")
+    meta: Dict[str, Any] = Field(
+        ..., description="Contents of the brand's meta.json."
+    )
+
+
+class BrandUploadResponse(BaseModel):
+    """Response body for POST /brands/{slug}."""
+
+    slug: str = Field(..., description="Brand identifier slug.")
+    created: bool = Field(
+        ...,
+        description=(
+            "True if this was a new brand creation; False if an "
+            "existing brand was replaced."
         ),
     )
