@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Tom Sayles
 """
 main.py
 ─────────────────────────────────────────────────────────────────────────────
@@ -5,7 +7,7 @@ FastAPI application for the md-to-pdf branded document rendering service.
 
 Endpoints
 ---------
-  GET  /health      — liveness probe
+  GET  /healthz     — liveness probe
   GET  /brands      — list available brand identifiers
   POST /render      — render Markdown to a branded PDF
 """
@@ -38,14 +40,14 @@ app = FastAPI(
         "Accepts Markdown and returns a print-ready branded PDF. "
         "Brand configurations are loaded from the ``/brands`` volume mount."
     ),
-    version="1.0.0",
+    version="0.1.0",
 )
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
-@app.get("/health", summary="Liveness probe")
+@app.get("/healthz", summary="Liveness probe")
 def health() -> dict:
     """Return service health status and dependency versions."""
     versions: dict = {"status": "ok"}

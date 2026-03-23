@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Tom Sayles
 """
 models.py
 ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +43,7 @@ class RenderRequest(BaseModel):
         ...,
         description=(
             "Brand identifier. Must match a sub-directory name under the "
-            "configured brands volume (e.g. 'greencrest-villa')."
+            "configured brands volume (e.g. 'acme-corp')."
         ),
     )
     markdown: Union[str, List[str]] = Field(
