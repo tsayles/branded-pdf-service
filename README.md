@@ -4,7 +4,6 @@
 
 [![CI](https://github.com/tsayles/branded-pdf-service/actions/workflows/ci.yml/badge.svg)](https://github.com/tsayles/branded-pdf-service/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Docker Pulls](https://img.shields.io/docker/pulls/tsayles/branded-pdf-service)](https://hub.docker.com/r/tsayles/branded-pdf-service)
 
 ---
 
@@ -20,7 +19,7 @@ design decision optimizes for machine-friendly operation:
 - Simple JSON request body -- no multipart forms, no file uploads for rendering
 - Predictable error responses with HTTP status codes agents can branch on
 - Bearer token auth -- one env var, one header, done
-- MCP tool interface (roadmap) -- native tool discovery for MCP-compatible agents
+- MCP tool interface -- native tool discovery for MCP-compatible agents (stdio transport, `python -m app.mcp_server`)
 - No browser, no GUI, no polling -- `POST /render` returns the PDF bytes directly
 
 Human operators configure and maintain the service; agents are the primary
@@ -31,18 +30,31 @@ callers at runtime.
 ## Quick start
 
 ```bash
+# Build the image
+docker build -t branded-pdf-service:latest .
+
+# Run (open mode — no auth)
 docker run -d \
   --name branded-pdf \
   -p 8100:8000 \
-  -v ./brands/acme-corp:/brands/acme-corp:ro \
-  ghcr.io/tsayles/branded-pdf-service:latest
+  -v ./brands/acme-corp:/brands/acme-corp \
+  branded-pdf-service:latest
 ```
 
-Render a document:
+Render a document (open mode — no auth header needed):
 
 ```bash
 curl -s -X POST http://localhost:8100/render \
   -H "Content-Type: application/json" \
+  -d '{"brand":"acme-corp","markdown":"# Hello World\n\nThis is a test."}' \
+  -o output.pdf
+```
+
+```bash
+# With auth enabled (PDF_API_KEYS set)
+curl -s -X POST http://localhost:8100/render \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-api-key>" \
   -d '{"brand":"acme-corp","markdown":"# Hello World\n\nThis is a test."}' \
   -o output.pdf
 ```
@@ -154,10 +166,44 @@ Mount your brand configs at `/brands`:
 
 ```yaml
 volumes:
-  - ./my-brands:/brands:ro
+  - ./my-brands:/brands
 ```
 
 Each sub-directory of `/brands` becomes an available brand identifier.
+
+> **Note:** When using the Brand Management API (`POST /DELETE /brands/{slug}`), the volume must be
+> read-write (no `:ro`). Use `:ro` only if you manage brand files outside the container.
+
+---
+
+## Authentication
+
+By default the service runs in **open mode** — all endpoints are accessible without credentials.
+
+To enable authentication, set `PDF_API_KEYS` to one or more Bearer tokens:
+
+```bash
+# Generate a token
+python -m app.keygen
+
+# Set it at container startup
+docker run -d --name branded-pdf \
+  -e PDF_API_KEYS=<your-token> \
+  -p 8100:8000 \
+  -v ./brands:/brands \
+  branded-pdf-service:latest
+```
+
+Protected endpoints (require `Authorization: Bearer <token>`):
+- `POST /render`
+- `POST /brands/{slug}`
+- `DELETE /brands/{slug}`
+- `GET /brands/{slug}/preview`
+
+Open endpoints (no auth required):
+- `GET /healthz`
+- `GET /brands`
+- `GET /brands/{slug}`
 
 ---
 
@@ -169,8 +215,8 @@ Each sub-directory of `/brands` becomes an available brand identifier.
 | `PANDOC_PATH` | `/usr/local/bin/pandoc` | Pandoc binary path |
 | `TYPST_PATH` | `/usr/local/bin/typst` | Typst binary path |
 | `PYTHONUNBUFFERED` | `1` | Disable Python output buffering |
-
-Authentication variables (`PDF_API_KEYS`) are added in v0.2.0 (Phase 5b).
+| `PDF_API_KEYS` | *(unset)* | Comma-separated Bearer tokens. Unset = open mode (no auth enforced) |
+| `PDF_API_KEYS_FILE` | *(unset)* | Path to a file with one token per line (alternative to `PDF_API_KEYS`) |
 
 ---
 
@@ -179,15 +225,18 @@ Authentication variables (`PDF_API_KEYS`) are added in v0.2.0 (Phase 5b).
 ```yaml
 services:
   branded-pdf:
-    image: ghcr.io/tsayles/branded-pdf-service:latest
+    image: branded-pdf-service:latest
     container_name: branded-pdf
     restart: unless-stopped
     ports:
       - "8100:8000"
     volumes:
-      - ./my-brands:/brands:ro
+      # Use rw (no :ro) if you want to use the Brand Management API (POST/DELETE /brands/{slug})
+      # Use :ro only if brand files are managed entirely outside the container
+      - ./my-brands:/brands
     environment:
       BRANDS_DIR: /brands
+      PDF_API_KEYS: ${PDF_API_KEYS:-}
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -225,12 +274,11 @@ PDF bytes returned in HTTP response
 
 ## Roadmap
 
-| Version | Feature |
-|---------|---------|
-| v0.1.0 | Core rendering service (current) |
-| v0.2.0 | Brand Management API -- runtime CRUD for brand configs |
-| v0.2.0 | KISS Authentication -- Bearer token, agent-friendly |
-| v0.2.0 | MCP Server -- native tool interface for MCP-compatible agents |
+| Version | Status | Feature |
+|---------|--------|---------|
+| v0.1.0 | ✅ Released | Core rendering service (`POST /render`, brand templates, watermarks) |
+| v0.2.0 | ✅ Released | Brand Management API, KISS Authentication, MCP Server (stdio) |
+| v0.3.0 | 🗺️ Planned | Docker Hub publish; multi-arch image; CI image push on tag |
 
 ---
 
