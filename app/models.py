@@ -6,12 +6,31 @@ models.py
 Pydantic request / response models for the md-to-pdf service.
 """
 
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
-class DocMeta(BaseModel):
+class BrandMetaResponse(BaseModel):
+    """Response body for GET /brands/{slug}."""
+
+    slug: str = Field(..., description="Brand identifier slug.")
+    meta: Dict[str, Any] = Field(
+        ..., description="Contents of the brand's meta.json."
+    )
+
+
+class BrandUploadResponse(BaseModel):
+    """Response body for POST /brands/{slug}."""
+
+    slug: str = Field(..., description="Brand identifier slug.")
+    created: bool = Field(
+        ...,
+        description=(
+            "True if this was a new brand creation; False if an "
+            "existing brand was replaced."
+        ),
+    )
     """Document-level metadata injected into the branded header / meta bar."""
 
     prepared_by: Optional[str] = Field(
