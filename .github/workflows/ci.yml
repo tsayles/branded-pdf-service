@@ -22,10 +22,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install test dependencies
-        run: pip install pytest requests fastapi pydantic reportlab pypdf
+        run: pip install pytest requests fastapi pydantic reportlab pypdf python-multipart httpx mcp
 
       - name: Run unit tests
-        run: pytest tests/test_brand_loader.py -v
+        run: pytest tests/ -v
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -36,6 +36,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: false
+          load: true
           tags: branded-pdf-service:ci
 
       - name: Smoke-test healthz
@@ -44,6 +45,13 @@ jobs:
             -p 8100:8000 \
             -v ${{ github.workspace }}/brands/acme-corp:/brands/acme-corp:ro \
             branded-pdf-service:ci
-          sleep 15
+          for i in $(seq 1 12); do
+            sleep 5
+            if curl -sf http://localhost:8100/healthz; then
+              echo "Service is up"
+              break
+            fi
+            echo "Waiting... attempt $i/12"
+          done
           curl -f http://localhost:8100/healthz
           docker stop pdf-ci
