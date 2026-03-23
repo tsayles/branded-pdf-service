@@ -18,6 +18,8 @@ import os
 import pytest
 import requests
 
+pytestmark = pytest.mark.integration
+
 BASE_URL = os.environ.get("PDF_SERVICE_URL", "http://localhost:8100")
 
 SAMPLE_MARKDOWN = """

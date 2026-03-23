@@ -25,7 +25,7 @@ jobs:
         run: pip install pytest requests fastapi pydantic reportlab pypdf python-multipart httpx mcp
 
       - name: Run unit tests
-        run: pytest tests/ -v
+        run: pytest tests/ -v -m "not integration"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
