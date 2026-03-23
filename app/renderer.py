@@ -348,6 +348,73 @@ def _assemble_pdfs(pdf_bytes_list: List[bytes]) -> bytes:
     return out.getvalue()
 
 
+# ── Brand validation ──────────────────────────────────────────────────────────
+
+
+def validate_brand_typ(
+    brand_typ_content: str,
+    logo_bytes: Optional[bytes] = None,
+) -> None:
+    """Test-compile a Typst brand template to verify it is valid.
+
+    Creates a minimal full document (template + simple body), compiles it
+    with Typst, and discards the output.  Raises ``ValueError`` if the
+    template produces a Typst compile error.
+
+    Args:
+        brand_typ_content: Typst template string (the ``brand.typ``
+            content).
+        logo_bytes: Optional PNG logo bytes to include in the compile
+            directory, mirroring runtime behaviour.
+
+    Raises:
+        ValueError: If ``typst compile`` exits non-zero, with the
+            Typst error message as the detail.
+        subprocess.CalledProcessError: Propagated for unexpected
+            non-compile failures.
+    """
+    test_body = (
+        "= Validation\n\n"
+        "Template compile check. Test content only.\n"
+    )
+    brand = {
+        "template": brand_typ_content,
+        "logo_bytes": logo_bytes,
+        "meta": {},
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        typst_src = build_typst(test_body, brand, {})
+        pdf_path = os.path.join(tmpdir, "validate.pdf")
+        try:
+            compile_typst(typst_src, brand, pdf_path)
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode(errors="replace").strip()
+            raise ValueError(
+                f"brand.typ failed to compile: {stderr}"
+            ) from exc
+
+
+# ── Brand deletion ────────────────────────────────────────────────────────────
+
+
+def remove_brand(brand_id: str, brands_dir: str = BRANDS_DIR) -> None:
+    """Delete a brand directory from the brands volume.
+
+    Args:
+        brand_id: Sub-directory name under ``brands_dir``.
+        brands_dir: Path to the brands root directory.
+
+    Raises:
+        ValueError: If the brand does not exist.
+    """
+    brand_path = os.path.join(brands_dir, brand_id)
+    if not os.path.isdir(brand_path):
+        raise ValueError(f"Brand '{brand_id}' not found at {brand_path}")
+    import shutil
+    shutil.rmtree(brand_path)
+    logger.info("Deleted brand '%s'", brand_id)
+
+
 # ── Public rendering entry point ──────────────────────────────────────────────
 
 
