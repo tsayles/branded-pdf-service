@@ -6,10 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned
-- Phase 5a: Brand Management API (runtime CRUD for brand configs)
-- Phase 5b: KISS Authentication (Bearer token, agent-friendly)
-- Phase 5c: MCP Server interface (stdio transport, agent tool manifest)
+---
+
+## [0.2.1] -- 2026-03-23
+
+### Fixed
+- CI: `docker/build-push-action@v5` with `push: false` does not load the
+  built image into the local Docker daemon without `load: true`; the
+  `Smoke-test healthz` step was failing with "pull access denied" (#8)
+- CI: `pytest tests/ -v` collected `smoke_test.py` which makes live HTTP
+  requests — added `pytestmark = pytest.mark.integration` and run unit
+  tests with `-m "not integration"` to exclude live-service tests (#8)
+
+### Added
+- `pytest.ini` registering the `integration` marker
+- CI: expanded test dependencies (`python-multipart`, `httpx`, `mcp`)
+- CI: replaced fixed `sleep 15` healthz wait with a 60-second polling loop
+
+---
+
+## [0.2.0] -- 2026-03-23
+
+### Added
+- `GET /brands/{slug}` -- brand metadata endpoint (open, no auth required)
+- `POST /brands/{slug}` -- upload/replace a brand at runtime (multipart;
+  Typst template validated before save) (#2)
+- `DELETE /brands/{slug}` -- remove a brand; last-brand guard returns 409 (#2)
+- `GET /brands/{slug}/preview` -- render a one-page brand preview PDF (#2)
+- `app/auth.py` -- Bearer token authentication via `PDF_API_KEYS` env var
+  (comma-separated) or `PDF_API_KEYS_FILE`; open mode when unset (#4)
+- `app/keygen.py` -- `python -m app.keygen` generates a 32-byte URL-safe
+  token (#4)
+- `app/mcp_server.py` -- FastMCP stdio server exposing 5 tools:
+  `render_pdf`, `list_brands`, `get_brand_meta`, `upload_brand`,
+  `preview_brand` (#6)
+- `tests/test_brand_api.py` -- 17 unit tests for brand management endpoints
+- `tests/test_auth.py` -- 20 unit tests for auth (open and keyed mode)
+- `tests/test_mcp_server.py` -- 13 unit tests for MCP tools
+
+### Changed
+- `app/main.py`: FastAPI lifespan context manager replaces deprecated
+  `on_event`; version bumped to 0.2.0
+- Protected endpoints (`POST /render`, `POST/DELETE /brands/{slug}`,
+  `GET /brands/{slug}/preview`) require `Authorization: Bearer <token>`
+  when auth is enabled
+- `requirements.txt`: added `python-multipart>=0.0.9`, `mcp[cli]>=1.0.0`
 
 ---
 
@@ -41,5 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   during Phase 6 homelab deployment. Docker is not available in the Windows
   development environment where this repo was assembled.
 
-[Unreleased]: https://github.com/tsayles/branded-pdf-service/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tsayles/branded-pdf-service/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tsayles/branded-pdf-service/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/tsayles/branded-pdf-service/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tsayles/branded-pdf-service/releases/tag/v0.1.0
