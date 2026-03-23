@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    name: Build image and run unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest requests fastapi pydantic reportlab pypdf
+
+      - name: Run unit tests
+        run: pytest tests/test_brand_loader.py -v
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: branded-pdf-service:ci
+
+      - name: Smoke-test healthz
+        run: |
+          docker run -d --name pdf-ci \
+            -p 8100:8000 \
+            -v ${{ github.workspace }}/brands/acme-corp:/brands/acme-corp:ro \
+            branded-pdf-service:ci
+          sleep 15
+          curl -f http://localhost:8100/healthz
+          docker stop pdf-ci

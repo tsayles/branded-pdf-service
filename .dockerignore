@@ -1,0 +1,15 @@
+.git
+.github
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.coverage
+htmlcov
+tests
+brands
+*.md
+.env
+secrets
+.vscode
+.idea

@@ -1,333 +1,239 @@
-# md-to-pdf — Branded Markdown-to-PDF Service
+# branded-pdf-service
 
-A self-hosted Docker container that accepts plain Markdown and returns a
-branded, print-ready PDF.  Replaces per-project PowerShell / Python build
-scripts with a single reusable service.
+**A self-hosted, agent-friendly Markdown-to-PDF rendering service with pluggable brand templates.**
 
-## Rendering pipeline
+[![CI](https://github.com/tsayles/branded-pdf-service/actions/workflows/ci.yml/badge.svg)](https://github.com/tsayles/branded-pdf-service/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tsayles/branded-pdf-service)](https://hub.docker.com/r/tsayles/branded-pdf-service)
 
-```
-Markdown  →  Pandoc 3.x (--to typst)  →  Typst body fragment
-                                               ↓
-                           Brand config (brand.typ template + meta.json)
-                                               ↓
-                            build_typst() — template + meta block + body
-                                               ↓
-                             typst compile  →  PDF section(s)
-                                               ↓
-                    reportlab (optional)  →  watermark PDF
-                                               ↓
-                     pypdf  →  stamp + assemble  →  final PDF
-```
+---
 
-**Why Typst?**  A four-way bake-off (Pandoc/odfpy, Pandoc/Typst,
-LibreOffice HTML import, LibreOffice headless) confirmed that Typst
-delivers full brand fidelity — logo header, accent rules, styled
-headings, blockquotes with fill, and dark-header tables — in a single
-compile pass.  `typst compile` is a self-contained binary with no
-runtime dependencies, making it significantly simpler to containerize
-than the Chrome headless approach.
+## Who this is for
+
+**Primary users: AI agents and automation pipelines.**
+
+This service is designed to be called by agentic workers -- Claude, GPT-based
+agents, LangChain pipelines, CI/CD workflows -- that need to produce
+branded, print-ready PDFs from Markdown without human involvement. Every
+design decision optimizes for machine-friendly operation:
+
+- Simple JSON request body -- no multipart forms, no file uploads for rendering
+- Predictable error responses with HTTP status codes agents can branch on
+- Bearer token auth -- one env var, one header, done
+- MCP tool interface (roadmap) -- native tool discovery for MCP-compatible agents
+- No browser, no GUI, no polling -- `POST /render` returns the PDF bytes directly
+
+Human operators configure and maintain the service; agents are the primary
+callers at runtime.
 
 ---
 
 ## Quick start
 
 ```bash
-cd services/md-to-pdf
-docker compose up -d
+docker run -d \
+  --name branded-pdf \
+  -p 8100:8000 \
+  -v ./brands/acme-corp:/brands/acme-corp:ro \
+  ghcr.io/tsayles/branded-pdf-service:latest
+```
 
-# Basic render test
+Render a document:
+
+```bash
 curl -s -X POST http://localhost:8100/render \
   -H "Content-Type: application/json" \
-  -d '{
-        "brand": "greencrest-villa",
-        "markdown": "# Hello World\n\nThis is a test document.",
-        "meta": {
-          "prepared_by": "Board of Directors",
-          "date": "2026-03-22",
-          "subject": "Test Document",
-          "status": "DRAFT"
-        },
-        "watermark": "DRAFT"
-      }' \
+  -d '{"brand":"acme-corp","markdown":"# Hello World\n\nThis is a test."}' \
   -o output.pdf
 ```
 
 ---
 
-## API Reference
+## API reference
 
-### `GET /health`
+### `GET /healthz`
+Liveness probe. Returns Pandoc and Typst versions. No auth required.
 
-Returns service health status and dependency versions.
-
-**Response** `200 OK`
-
+**Response 200:**
 ```json
 {
   "status": "ok",
   "pandoc": "pandoc 3.6.4",
-  "typst": "typst 0.13.1"
+  "typst": "typst 0.14.2"
 }
 ```
 
 ---
 
 ### `GET /brands`
+List all registered brand identifiers. No auth required.
 
-Returns a sorted list of all available brand identifiers.
-
-**Response** `200 OK`
-
-```json
-["greencrest-villa", "mike-and-key", "traintracking", "wiseman-of-the-internet"]
-```
+**Response 200:** `["acme-corp", "my-brand"]`
 
 ---
 
 ### `POST /render`
+Render Markdown to a branded PDF.
 
-Render one or more Markdown sections to a single branded PDF.
-
-**Request body** (`application/json`)
-
-| Field       | Type               | Required | Description |
-|-------------|--------------------|----------|-------------|
-| `brand`     | `string`           | ✅        | Brand identifier (must exist in the brands volume). |
-| `markdown`  | `string \| string[]` | ✅      | Markdown content. Provide a list for multi-section documents. |
-| `meta`      | `object`           | —        | Optional document metadata. |
-| `watermark` | `string`           | —        | Diagonal watermark text (e.g. `"DRAFT"`). |
-
-**`meta` object**
-
-| Field         | Type     | Description |
-|---------------|----------|-------------|
-| `prepared_by` | `string` | Author / originating body. |
-| `date`        | `string` | Document date (ISO 8601 recommended). |
-| `subject`     | `string` | Document subject / title. |
-| `status`      | `string` | Status label (e.g. `DRAFT`, `FINAL`). |
-
-**Example — single section**
-
+**Request body:**
 ```json
 {
-  "brand": "greencrest-villa",
-  "markdown": "# Building Envelope Study\n\n## Executive Summary\n\n...",
+  "brand": "acme-corp",
+  "markdown": "# Title\n\nBody text.",
   "meta": {
-    "prepared_by": "Board of Directors",
-    "date": "2026-03-22",
-    "subject": "Building Envelope Study",
+    "prepared_by": "Automated Agent",
+    "date": "2026-01-15",
+    "subject": "Quarterly Report",
     "status": "DRAFT"
   },
   "watermark": "DRAFT"
 }
 ```
 
-**Example — multi-section document**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `brand` | string | yes | Brand identifier -- must match a sub-directory under `/brands` |
+| `markdown` | string or array | yes | Markdown content. Array = multi-section document |
+| `meta` | object | no | Document metadata rendered as a styled header block |
+| `watermark` | string | no | Diagonal watermark stamped on every page (e.g. `"DRAFT"`) |
 
-```json
-{
-  "brand": "mike-and-key",
-  "markdown": [
-    "# March Meeting Minutes\n\n## Call to Order\n\n...",
-    "## Appendix A — Treasurer's Report\n\n..."
-  ],
-  "meta": {
-    "prepared_by": "Club Secretary",
-    "date": "2026-03-15",
-    "subject": "March 2026 Meeting Minutes"
-  }
-}
-```
-
-**Response** `200 OK`
-
-- `Content-Type: application/pdf`
-- `Content-Disposition: attachment; filename="<subject>.pdf"`
-- Body: raw PDF bytes
-
-**Error responses**
-
-| Status | Cause |
-|--------|-------|
-| `400`  | Unknown brand identifier or malformed request. |
-| `500`  | Pandoc or Typst compilation failure. |
+**Response 200:** `application/pdf` binary
+**Response 400:** Unknown brand or invalid input
+**Response 500:** Pandoc or Typst rendering failure
 
 ---
 
-## Brand configuration
+## Brand config format
 
-Each brand is a sub-directory under the brands volume.  The default
-volume mount is `./brands` (relative to `services/md-to-pdf/`).
-
-### Directory layout
+Each brand is a directory under the `/brands` volume mount:
 
 ```
-brands/
-└── <brand-id>/
-    ├── meta.json   ← required
-    ├── brand.typ   ← required  (Typst template)
-    └── logo.png    ← optional  (placed alongside .typ at compile time)
+/brands/
+  acme-corp/
+    meta.json     <- organisation metadata
+    brand.typ     <- Typst brand template
+    logo.png      <- organisation logo (optional)
 ```
 
 ### `meta.json`
 
 ```json
 {
-  "org_name":     "Full Organisation Name",
-  "footer_text":  "Footer line printed at the bottom of every page",
+  "org_name": "Acme Corporation",
+  "footer_text": "Acme Corporation - A Company Making Everything",
   "default_font": "Liberation Sans",
   "heading_font": "Liberation Serif"
 }
 ```
 
-| Key            | Required | Description |
-|----------------|----------|-------------|
-| `org_name`     | ✅        | Displayed in the header band. |
-| `footer_text`  | ✅        | Printed in the footer bar. |
-| `default_font` | —        | Informational only. |
-| `heading_font` | —        | Informational only. |
-
 ### `brand.typ`
 
-A Typst source file that is **prepended** to the Pandoc-generated body.
-It defines page layout, heading styles, table styles, blockquote styles,
-and the `#horizontalrule` compatibility shim required by Pandoc.
+The Typst template that defines page layout, colours, heading styles, and more.
+See `brands/acme-corp/brand.typ` for the fully-commented reference implementation.
 
-The renderer assembles the final document as:
+The template is prepended to the Pandoc-generated Typst body at render time.
+It must define `#set page(...)` and all heading/paragraph show rules. It must
+also define `#let horizontalrule = ...` (Pandoc compatibility shim).
 
-```
-[brand.typ contents]
+### Fonts
 
-[meta block — injected from request meta fields]
+The container ships with Liberation fonts:
+- **Liberation Serif** approx Times New Roman (headings)
+- **Liberation Sans** approx Arial (body text)
+- **Liberation Mono** approx Courier New (code blocks)
+- **Open Sans** (available as an alternative body font)
 
-[pandoc --to typst body]
-```
-
-#### Minimum viable template
-
-```typst
-#set page(paper: "us-letter", margin: 1in)
-#set text(font: "Liberation Sans", size: 11pt)
-
-// Required Pandoc compatibility shim
-#let horizontalrule = line(length: 100%)
-```
-
-#### Adding a logo
-
-1. Place `logo.png` in the brand directory alongside `brand.typ`.
-2. The renderer copies it to the compile temp-dir automatically.
-3. Uncomment (or add) an `#image("logo.png", ...)` call in the
-   `header:` block of your `#set page(...)`.
-
-Example header with logo:
-
-```typst
-#set page(
-  header: [
-    #grid(columns: (0.65in, 1fr), gutter: 8pt,
-      align(center + horizon)[
-        #image("logo.png", width: 0.55in)
-      ],
-      align(left + horizon)[
-        #text(font: "Liberation Serif", size: 12pt,
-              weight: "bold")[My Organisation]
-      ],
-    )
-    #line(length: 100%, stroke: 1.5pt + rgb("#b8922a"))
-  ],
-)
-```
-
-#### Font notes
-
-The container installs **Liberation Serif** and **Liberation Sans**
-(`fonts-liberation`) and **Open Sans** (`fonts-open-sans`).  Use any
-of these by name in your Typst template.  Typst searches the system
-font directories — no additional configuration is required.
-
-| Typst font name       | Equivalent to      | Package         |
-|-----------------------|--------------------|-----------------|
-| `"Liberation Serif"`  | Times New Roman    | fonts-liberation |
-| `"Liberation Sans"`   | Arial              | fonts-liberation |
-| `"Liberation Mono"`   | Courier New        | fonts-liberation |
-| `"Open Sans"`         | Open Sans          | fonts-open-sans  |
-
----
-
-## Included brands
-
-| Brand ID                   | Organisation |
-|----------------------------|--------------|
-| `greencrest-villa`         | Greencrest Villa Owners Association |
-| `mike-and-key`             | Mike & Key Amateur Radio Club |
-| `wiseman-of-the-internet`  | WiseManOfTheInternet |
-| `traintracking`            | TrainTracking.us |
-
-### Adding a new brand
-
-1. Create `brands/<brand-id>/` directory.
-2. Add `meta.json` and `brand.typ`; optionally add `logo.png`.
-3. The new brand is immediately available via `POST /render` — no
-   restart required (brands are loaded on every request).
+Custom fonts can be added by extending the Dockerfile or by mounting a fonts
+directory and running `fc-cache`.
 
 ---
 
 ## Volume mount
 
-The brands directory is mounted read-only at `/brands` inside the
-container.  Override `BRANDS_DIR` if you prefer a different mount
-point:
+Mount your brand configs at `/brands`:
 
 ```yaml
 volumes:
-  - /path/to/your/brands:/data/brands:ro
-environment:
-  BRANDS_DIR: /data/brands
+  - ./my-brands:/brands:ro
 ```
+
+Each sub-directory of `/brands` becomes an available brand identifier.
 
 ---
 
 ## Environment variables
 
-| Variable      | Default                   | Description |
-|---------------|---------------------------|-------------|
-| `BRANDS_DIR`  | `/brands`                 | Path to the brands volume inside the container. |
-| `PANDOC_PATH` | `/usr/local/bin/pandoc`   | Path to the Pandoc 3.x binary. |
-| `TYPST_PATH`  | `/usr/local/bin/typst`    | Path to the Typst binary. |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BRANDS_DIR` | `/brands` | Path to the brands volume inside the container |
+| `PANDOC_PATH` | `/usr/local/bin/pandoc` | Pandoc binary path |
+| `TYPST_PATH` | `/usr/local/bin/typst` | Typst binary path |
+| `PYTHONUNBUFFERED` | `1` | Disable Python output buffering |
+
+Authentication variables (`PDF_API_KEYS`) are added in v0.2.0 (Phase 5b).
 
 ---
 
-## Development
+## Docker Compose example
 
-```bash
-# Install Python dependencies locally
-pip install -r requirements.txt
-
-# Run the service locally (requires Pandoc 3.x and Typst on PATH)
-BRANDS_DIR=./brands uvicorn app.main:app --reload
-
-# Interactive API docs
-open http://localhost:8000/docs
+```yaml
+services:
+  branded-pdf:
+    image: ghcr.io/tsayles/branded-pdf-service:latest
+    container_name: branded-pdf
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    volumes:
+      - ./my-brands:/brands:ro
+    environment:
+      BRANDS_DIR: /brands
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 ```
 
-### Installing Typst locally
+---
 
-```bash
-# macOS
-brew install typst
+## Rendering pipeline
 
-# Linux (manual)
-curl -fsSL https://github.com/typst/typst/releases/latest/download/\
-typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ
-sudo install typst-x86_64-unknown-linux-musl/typst /usr/local/bin/
-
-# Windows
-winget install Typst.Typst
+```
+Markdown input
+    |
+    v
+Pandoc 3.x  (--from markdown+smart --to typst)
+    |  Typst body fragment
+    v
+Template injection  (brand.typ + meta block prepended)
+    |  Complete .typ document
+    v
+typst compile  (static binary, single pass)
+    |  PDF
+    v
+Optional: reportlab watermark -> pypdf stamp
+    |
+    v
+PDF bytes returned in HTTP response
 ```
 
-### Installing Pandoc 3.x locally
+---
 
-Download the appropriate package from
-<https://github.com/jgm/pandoc/releases>.
+## Roadmap
+
+| Version | Feature |
+|---------|---------|
+| v0.1.0 | Core rendering service (current) |
+| v0.2.0 | Brand Management API -- runtime CRUD for brand configs |
+| v0.2.0 | KISS Authentication -- Bearer token, agent-friendly |
+| v0.2.0 | MCP Server -- native tool interface for MCP-compatible agents |
+
+---
+
+## License
+
+[GPL-3.0-or-later](LICENSE) (C) 2026 Tom Sayles
