@@ -76,6 +76,25 @@ is gitignored and volume-mounted at runtime. Use the brand management API
   # SPDX-FileCopyrightText: <year> <your name>
   ```
 
+## Merge strategy
+
+**This project uses squash merge for all feature and fix branches.**
+
+Rationale: each feature or fix PR represents a single logical unit of change.
+Squashing collapses the granular implementation commits (which are not
+meaningful to the project history) into one well-described commit on `main`,
+keeping the main-branch log readable as a high-level changelog. The individual
+commits are still visible in the PR for reviewers.
+
+When merging a PR:
+1. Use **"Squash and merge"** in the GitHub UI (or `gh pr merge --squash`).
+2. Edit the squash commit message to be a well-formed conventional-commit
+   summary, e.g. `feat(brands): add runtime brand management API (#12)`.
+3. Delete the branch after merging.
+
+Merge commits (non-squash) are reserved for release integration branches where
+preserving the full branch history is important (e.g., backport merges).
+
 ## Code of Conduct
 
 This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
