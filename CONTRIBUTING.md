@@ -51,10 +51,30 @@ is gitignored and volume-mounted at runtime. Use the brand management API
 
 ## Code style
 
-- Python: follow PEP 8. No formatter is enforced yet; just be consistent.
-- Typst templates: follow the structure of `brands/acme-corp/brand.typ`.
-- Commit messages: use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`).
-- All new `.py` files must have an SPDX header.
+- **Python — PEP 8:** Follow [PEP 8](https://peps.python.org/pep-0008/) for all
+  Python source files. No formatter is enforced yet; just be consistent with the
+  surrounding code.
+- **Line length — 80 columns:** Hard-wrap all Python source lines at **80
+  characters**. This applies to code, inline comments, and docstrings. The
+  existing source files use 80-col wrapping; new contributions must match.
+  Configure your editor accordingly (e.g. `rulers = [80]` in VS Code,
+  `set colorcolumn=80` in Vim).
+- **Docstrings — PEP 257:** All public modules, classes, functions, and methods
+  must have a docstring conforming to [PEP 257](https://peps.python.org/pep-0257/).
+  Use the multi-line Google-style format already established in the codebase:
+  summary line, blank line, then named sections (`Args:`, `Returns:`,
+  `Raises:`) as needed. One-liner docstrings are acceptable only for trivial
+  private helpers.
+- **Typst templates:** Follow the structure of `brands/acme-corp/brand.typ`
+  (section comments, colour variables first, then page/text/heading/quote/table
+  rules in that order).
+- **Commit messages:** Use conventional commits (`feat:`, `fix:`, `chore:`,
+  `docs:`).
+- **SPDX headers:** All new `.py` files must start with:
+  ```python
+  # SPDX-License-Identifier: GPL-3.0-or-later
+  # SPDX-FileCopyrightText: <year> <your name>
+  ```
 
 ## Code of Conduct
 
