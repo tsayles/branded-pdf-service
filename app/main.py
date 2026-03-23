@@ -22,11 +22,13 @@ import os
 import re
 import shutil
 import subprocess
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
 
+from .auth import auth_is_enabled, require_auth
 from .models import (
     BrandMetaResponse,
     BrandUploadResponse,
@@ -48,6 +50,21 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+
+
+@asynccontextmanager
+async def _lifespan(application):
+    """FastAPI lifespan: log auth mode at startup."""
+    if auth_is_enabled():
+        logger.info("Auth enabled — Bearer token required for writes.")
+    else:
+        logger.warning(
+            "Auth DISABLED — no PDF_API_KEYS configured. "
+            "Set PDF_API_KEYS to enable authentication."
+        )
+    yield
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +116,7 @@ app = FastAPI(
         "or pre-loaded from the ``/brands`` volume mount."
     ),
     version="0.2.0",
+    lifespan=_lifespan,
 )
 
 
@@ -255,6 +273,7 @@ async def upload_brand(
         default=None,
         description="Optional PNG logo file.",
     ),
+    _: None = Depends(require_auth),
 ) -> JSONResponse:
     """Create or replace a brand configuration.
 
@@ -352,7 +371,10 @@ async def upload_brand(
         409: {"description": "Cannot delete the last brand."},
     },
 )
-def delete_brand(slug: str) -> Response:
+def delete_brand(
+    slug: str,
+    _: None = Depends(require_auth),
+) -> Response:
     """Remove a brand configuration from the service.
 
     The last registered brand cannot be deleted (the service requires at
@@ -407,7 +429,10 @@ def delete_brand(slug: str) -> Response:
         500: {"description": "Rendering error."},
     },
 )
-def preview_brand(slug: str) -> Response:
+def preview_brand(
+    slug: str,
+    _: None = Depends(require_auth),
+) -> Response:
     """Render a standard preview document using the specified brand.
 
     The preview exercises the full rendering pipeline (headings, body
@@ -467,7 +492,10 @@ def preview_brand(slug: str) -> Response:
         500: {"description": "Internal rendering error."},
     },
 )
-def render(request: RenderRequest) -> Response:
+def render(
+    request: RenderRequest,
+    _: None = Depends(require_auth),
+) -> Response:
     """Render one or more Markdown sections to a single branded PDF.
 
     The ``markdown`` field accepts either a plain string or a list of
