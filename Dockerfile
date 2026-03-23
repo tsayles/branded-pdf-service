@@ -36,6 +36,7 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb" \
         -o /tmp/pandoc.deb \
       && dpkg -i /tmp/pandoc.deb \
+      && cp /usr/bin/pandoc /usr/local/bin/pandoc \
       && rm /tmp/pandoc.deb; \
     fi
 
